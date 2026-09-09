@@ -1,0 +1,47 @@
+name: ChatGPT WT9932P4 LVGL v9 build
+
+on:
+  push:
+    branches:
+      - chatgpt-wt9932p4-build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helper repo
+        uses: actions/checkout@v4
+
+      - name: Fetch historical WT9932P4-TINY source
+        run: |
+          git clone https://github.com/wireless-tag-com/WT9932P4-TINY.git
+          cd WT9932P4-TINY
+          git checkout 28c142b0cad9c505ec826daf0cbcfa8778c17e52
+          git rev-parse HEAD
+
+      - name: Build lvgl_demo_v9 with ESP-IDF v5.4
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4
+          target: esp32p4
+          path: WT9932P4-TINY/lvgl_demo_v9
+          command: idf.py build && cd build && esptool.py --chip esp32p4 merge_bin -o lvgl_demo_v9_merged_0x0.bin @flash_args
+
+      - name: Collect build files
+        run: |
+          mkdir -p artifact
+          cp WT9932P4-TINY/lvgl_demo_v9/build/lvgl_demo_v9.bin artifact/
+          cp WT9932P4-TINY/lvgl_demo_v9/build/lvgl_demo_v9_merged_0x0.bin artifact/
+          cp WT9932P4-TINY/lvgl_demo_v9/build/bootloader/bootloader.bin artifact/
+          cp WT9932P4-TINY/lvgl_demo_v9/build/partition_table/partition-table.bin artifact/
+          cp WT9932P4-TINY/lvgl_demo_v9/build/flash_args artifact/
+          cp WT9932P4-TINY/lvgl_demo_v9/sdkconfig artifact/
+          printf 'source_commit=28c142b0cad9c505ec826daf0cbcfa8778c17e52\nesp_idf=v5.4\nproject=lvgl_demo_v9\n' > artifact/BUILD_INFO.txt
+          sha256sum artifact/*.bin > artifact/SHA256SUMS.txt
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wt9932p4-lvgl-demo-v9-28c142b-idf54
+          path: artifact/
+          retention-days: 7
